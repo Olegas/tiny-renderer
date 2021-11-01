@@ -5,6 +5,9 @@ const ctx = cnv.getContext('2d');
 let id = ctx.getImageData(0, 0, w, h);
 const zBuffer = new Array(w * h);
 const vLight = [0, 0, -1];
+const vEye = [-0, 0, 6];
+const vCenter = [0, 0, 0];
+const vUp = [0, 1, 0];
 const depth = 255;
 
 function loadObj(path) {
@@ -176,11 +179,15 @@ function set(x, y, color) {
     }
 }
 
+function norm(v) {
+    return Math.sqrt(Math.pow(v[0], 2) + Math.pow(v[1], 2) + Math.pow(v[2], 2));
+}
+
 function normalize(v) {
-    const norm = Math.sqrt(Math.pow(v[0], 2) + Math.pow(v[1], 2) + Math.pow(v[2], 2));
-    v[0] = v[0] / norm;
-    v[1] = v[1] / norm;
-    v[2] = v[2] / norm;
+    const n = norm(v);
+    v[0] = v[0] / n;
+    v[1] = v[1] / n;
+    v[2] = v[2] / n;
     return v;
 }
 
@@ -233,8 +240,6 @@ function line(p1, p2, color) {
     }
 }
 
-
-
 function baricentric(pts, P, b) {
     const u = cross(
         [pts[2][0]-pts[0][0], pts[1][0]-pts[0][0], pts[0][0]-P[0]],
@@ -251,19 +256,35 @@ function baricentric(pts, P, b) {
     b[2]=u[0]/u[2];
 }
 
-const proj = M.fromArray(4, [
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, -1/3, 1
-])
+function lookat(eye, center, up) {
+    const z = normalize(sub(eye, center));
+    const x = normalize(cross(up, z));
+    const y = normalize(cross(z, x));
+    const res = M.i(4);
+    for (let i = 0; i < 3; i++) {
+        res.set(0, i, x[i]);
+        res.set(1,i, y[i]);
+        res.set(2, i, z[i]);
+        res.set(i, 3, -center[i]);
+    }
+    return res;
+}
+
+const proj = M.i(4);
 
 const vp = M.fromArray(4, [
     w/4, 0,    0,       w/2,
     0,   -h/4, 0,       h/2,
-    0,   0,    depth/2, 0,
+    0,   0,    depth/2, depth/2,
     0,   0,    0,       1
 ]);
+
+let view;
+
+function updateView() {
+    view = lookat(vEye, vCenter, vUp);
+    proj.set(3, 2, -1/norm(sub(vEye, vCenter)));
+}
 
 
 function extendTo3d(v) {
@@ -319,11 +340,12 @@ function gray(i) {
 
 const vWorld = new Array(3);
 const vScreen = new Array(3);
+
 function drawObj(o) {
     o.f.forEach((f) => {
         for(let i = 0; i < 3; i++) {
             vWorld[i] = o.v[f[i][0]];
-            vScreen[i] = to2d(vp.mul(proj.mul(M.fromVector(extendTo3d(vWorld[i])))).toVector());
+            vScreen[i] = to2d(vp.mul(proj.mul(view.mul(M.fromVector(extendTo3d(vWorld[i]))))).toVector());
         }
         const n = normalize(cross(
             sub(vWorld[2], vWorld[0]),
@@ -336,14 +358,38 @@ function drawObj(o) {
     })
 }
 
-function render(o) {
+let currentObject;
+
+function render() {
+    updateView();
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, w, h);
     id = ctx.getImageData(0, 0, w, h);
     zBuffer.fill(-Infinity);
-    drawObj(o);
+    drawObj(currentObject);
     ctx.putImageData(id, 0, 0);
 }
 
-loadObj('head.obj').then(render);
+loadObj('head.obj').then((o) => {
+    currentObject = o;
+    render();
+});
+
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowUp') {
+        vEye[1] ++;
+        render();
+    } else if (e.code === 'ArrowDown') {
+        vEye[1] --;
+        render();
+    } else if (e.code === 'ArrowLeft') {
+        vEye[0] ++;
+        render();
+    } else if (e.code === 'ArrowRight') {
+        vEye[0] --;
+        render();
+    }
+})
+
+
 
