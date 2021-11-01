@@ -285,16 +285,15 @@ function triangle(points, color) {
     const maxY = Math.max(points[0][1], points[1][1], points[2][1]);
     const v = [];
     const b = [];
-    const pointsPerspective = points;
     for(let x = minX; x <= maxX; x++) {
         for(let y = minY; y <= maxY; y++) {
             v[0] = x;
             v[1] = y;
             v[2] = 0;
-            baricentric(pointsPerspective, v, b);
+            baricentric(points, v, b);
             if (b[0] < 0 || b[1] < 0 || b[2] < 0) continue;
             v[2] = 0;
-            for(let i = 0; i < 3; i++) v[2] += pointsPerspective[i][2] * b[i];
+            for(let i = 0; i < 3; i++) v[2] += points[i][2] * b[i];
             const zBi = (v[0] + v[1] * w) >> 0;
             if (zBuffer[zBi] < v[2]) {
                 zBuffer[zBi] = v[2];
