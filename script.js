@@ -49,7 +49,7 @@ class M {
 
     static fromVectors(v) {
         const d = [];
-        for(const i of v) {
+        for (const i of v) {
             d.push(...i);
         }
         return new M(v[0].length, v.length, d);
@@ -63,7 +63,7 @@ class M {
     static i(d) {
         const _d = new Array(d * d);
         _d.fill(0);
-        for(let i = 0; i < d; i++) {
+        for (let i = 0; i < d; i++) {
             _d[i + i * d] = 1;
         }
         return new M(d, d, _d);
@@ -89,8 +89,8 @@ class M {
 
     get t() {
         const res = new M(this.cols, this.rows, new Array(this.d.length));
-        for(let i = 0; i < this.rows; i++) {
-            for(let j = 0; j < this.cols; j++) {
+        for (let i = 0; i < this.rows; i++) {
+            for (let j = 0; j < this.cols; j++) {
                 res.set(j, i, this.get(i, j));
             }
         }
@@ -125,11 +125,11 @@ class M {
             throw 'Incorrect dimensions';
 
         const d = new Array(_w * _h);
-        for(let i = 0; i < _h; i++) { // строка
-            for(let j = 0; j < _w; j++) { // столбец
+        for (let i = 0; i < _h; i++) { // строка
+            for (let j = 0; j < _w; j++) { // столбец
                 const idx = i + _h * j;
                 d[idx] = 0;
-                for(let k = 0; k < _h; k++) {
+                for (let k = 0; k < _h; k++) {
                     // i строка * j столбец
                     // перебираем столбцы --- перебираем строки
                     d[idx] += this.d[i + this.h * k] * _d[k + _h * j];
@@ -143,8 +143,8 @@ class M {
 
     toString() {
         let ret = '';
-        for(let i = 0; i < this.h; i++) {
-            for(let j = 0; j < this.w; j++) {
+        for (let i = 0; i < this.h; i++) {
+            for (let j = 0; j < this.w; j++) {
                 ret += this.d[j * this.h + i] + ' ';
             }
             ret += '\n';
@@ -160,7 +160,7 @@ class M {
 
     toVectors() {
         const res = [];
-        for(let i = 0; i < this.w; i++) {
+        for (let i = 0; i < this.w; i++) {
             res.push(this.d.slice(i * this.h, i * this.h + this.w + 1));
         }
         return res;
@@ -242,18 +242,18 @@ function line(p1, p2, color) {
 
 function baricentric(pts, P, b) {
     const u = cross(
-        [pts[2][0]-pts[0][0], pts[1][0]-pts[0][0], pts[0][0]-P[0]],
-        [pts[2][1]-pts[0][1], pts[1][1]-pts[0][1], pts[0][1]-P[1]]);
+        [pts[2][0] - pts[0][0], pts[1][0] - pts[0][0], pts[0][0] - P[0]],
+        [pts[2][1] - pts[0][1], pts[1][1] - pts[0][1], pts[0][1] - P[1]]);
     /* `pts` and `P` has integer value as coordinates
        so `abs(u[2])` < 1 means `u[2]` is 0, that means
        triangle is degenerate, in this case return something with negative coordinates */
-    if (Math.abs(u[2])<1) {
+    if (Math.abs(u[2]) < 1) {
         b[0] = -1;
         return;
     }
-    b[0]=1-(u[0]+u[1])/u[2];
-    b[1]=u[1]/u[2];
-    b[2]=u[0]/u[2];
+    b[0] = 1 - (u[0] + u[1]) / u[2];
+    b[1] = u[1] / u[2];
+    b[2] = u[0] / u[2];
 }
 
 function lookat(eye, center, up) {
@@ -263,7 +263,7 @@ function lookat(eye, center, up) {
     const res = M.i(4);
     for (let i = 0; i < 3; i++) {
         res.set(0, i, x[i]);
-        res.set(1,i, y[i]);
+        res.set(1, i, y[i]);
         res.set(2, i, z[i]);
         res.set(i, 3, -center[i]);
     }
@@ -273,17 +273,17 @@ function lookat(eye, center, up) {
 const proj = M.i(4);
 
 const vp = M.fromArray(4, [
-    w/4, 0,    0,       w/2,
-    0,   -h/4, 0,       h/2,
-    0,   0,    depth/2, depth/2,
-    0,   0,    0,       1
+    w / 3, 0, 0, w / 2,
+    0, -h / 3, 0, h / 2,
+    0, 0, depth / 2, depth / 2,
+    0, 0, 0, 1
 ]);
 
 let view;
 
 function updateView() {
     view = lookat(vEye, vCenter, vUp);
-    proj.set(3, 2, -1/norm(sub(vEye, vCenter)));
+    proj.set(3, 2, -1 / norm(sub(vEye, vCenter)));
 }
 
 
@@ -306,15 +306,15 @@ function triangle(points, color) {
     const maxY = Math.max(points[0][1], points[1][1], points[2][1]);
     const v = [];
     const b = [];
-    for(let x = minX; x <= maxX; x++) {
-        for(let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
             v[0] = x;
             v[1] = y;
             v[2] = 0;
             baricentric(points, v, b);
             if (b[0] < 0 || b[1] < 0 || b[2] < 0) continue;
             v[2] = 0;
-            for(let i = 0; i < 3; i++) v[2] += points[i][2] * b[i];
+            for (let i = 0; i < 3; i++) v[2] += points[i][2] * b[i];
             const zBi = (v[0] + v[1] * w) >> 0;
             if (zBuffer[zBi] < v[2]) {
                 zBuffer[zBi] = v[2];
@@ -343,7 +343,7 @@ const vScreen = new Array(3);
 
 function drawObj(o) {
     o.f.forEach((f) => {
-        for(let i = 0; i < 3; i++) {
+        for (let i = 0; i < 3; i++) {
             vWorld[i] = o.v[f[i][0]];
             vScreen[i] = to2d(vp.mul(proj.mul(view.mul(M.fromVector(extendTo3d(vWorld[i]))))).toVector());
         }
@@ -377,19 +377,28 @@ loadObj('head.obj').then((o) => {
 
 document.addEventListener('keyup', (e) => {
     if (e.code === 'ArrowUp') {
-        vEye[1] ++;
+        vEye[1]++;
         render();
     } else if (e.code === 'ArrowDown') {
-        vEye[1] --;
+        vEye[1]--;
         render();
     } else if (e.code === 'ArrowLeft') {
-        vEye[0] ++;
+        vEye[0]++;
         render();
     } else if (e.code === 'ArrowRight') {
-        vEye[0] --;
+        vEye[0]--;
         render();
     }
-})
+});
+
+const bcr = cnv.getBoundingClientRect();
+let frame;
+cnv.addEventListener('mousemove', (e) => {
+    vEye[0] = w / 2 - (e.pageX - bcr.left);
+    vEye[1] = (e.pageY - bcr.top) - h / 2;
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(render);
+});
 
 
 
