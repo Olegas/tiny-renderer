@@ -1,14 +1,18 @@
 const cnv = document.getElementById('canvas');
+const cnvZB = document.getElementById('zbuffer');
 const w = cnv.width;
 const h = cnv.height;
 const ctx = cnv.getContext('2d');
+const ctxZB = cnvZB.getContext('2d');
 let id = ctx.getImageData(0, 0, w, h);
 const zBuffer = new Array(w * h);
-const vLight = [0, 0, -1];
+const vLight = [-1, 0, -1];
 const vEye = [-0, 0, 6];
 const vCenter = [0, 0, 0];
 const vUp = [0, 1, 0];
 const depth = 255;
+let moveLight = false;
+let moveCam = false;
 
 function loadObj(path) {
     return fetch(path)
@@ -342,6 +346,7 @@ const vWorld = new Array(3);
 const vScreen = new Array(3);
 
 function drawObj(o) {
+    const vLightN = normalize([...vLight]);
     o.f.forEach((f) => {
         for (let i = 0; i < 3; i++) {
             vWorld[i] = o.v[f[i][0]];
@@ -351,11 +356,40 @@ function drawObj(o) {
             sub(vWorld[2], vWorld[0]),
             sub(vWorld[1], vWorld[0])
         ));
-        const intensity = dot(n, vLight);
+        const intensity = dot(n, vLightN);
         if (intensity > 0) {
             triangle(vScreen, gray(intensity));
         }
     })
+}
+
+function toColorArray(d) {
+    const res = new Array(d.length / 4);
+    res.fill(0);
+    for(let i = 0; i < d.length; i++) {
+        const bOffset = i % 4;
+        if (bOffset < 3) {
+            res[i / 4 >> 0] |= d[i] << (8 * bOffset);
+        }
+    }
+    return res;
+}
+
+function drawZBuffer() {
+    ctxZB.fillStyle = '#000000';
+    ctxZB.fillRect(0, 0, w, h);
+    const d = ctxZB.getImageData(0, 0, w, h);
+    for(let i = 0; i < w; i++) {
+        for(let j = 0; j < h; j++) {
+            let int = zBuffer[i + j * w] >> 0;
+            if (!isFinite(int)) int = 0;
+            const offset = (j * w + i) * 4;
+            for (let i = 0; i <= 3; i++) {
+                d.data[offset + i] = i < 3 ? int : 0xFF;
+            }
+        }
+    }
+    ctxZB.putImageData(d, 0, 0);
 }
 
 let currentObject;
@@ -368,36 +402,51 @@ function render() {
     zBuffer.fill(-Infinity);
     drawObj(currentObject);
     ctx.putImageData(id, 0, 0);
+    drawZBuffer();
 }
 
 loadObj('head.obj').then((o) => {
     currentObject = o;
     render();
+    moveLight();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyL') {
+        moveLight = true;
+        moveCam = false;
+    } else if (e.code === 'KeyC') {
+        moveCam = true;
+        moveLight = false;
+    }
 });
 
 document.addEventListener('keyup', (e) => {
-    if (e.code === 'ArrowUp') {
-        vEye[1]++;
-        render();
-    } else if (e.code === 'ArrowDown') {
-        vEye[1]--;
-        render();
-    } else if (e.code === 'ArrowLeft') {
-        vEye[0]++;
-        render();
-    } else if (e.code === 'ArrowRight') {
-        vEye[0]--;
-        render();
+    if (moveLight && e.code === 'KeyL') {
+        moveLight = false;
+    } else if (moveCam && e.code === 'KeyC') {
+        moveCam = false;
     }
 });
+
 
 const bcr = cnv.getBoundingClientRect();
 let frame;
 cnv.addEventListener('mousemove', (e) => {
-    vEye[0] = w / 2 - (e.pageX - bcr.left);
-    vEye[1] = (e.pageY - bcr.top) - h / 2;
-    cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(render);
+    let changes;
+    if (moveLight) {
+        vLight[0] = 1 - ((e.pageX - bcr.left) / bcr.width) * 2;
+        vLight[1] = ((e.pageY - bcr.top) / bcr.height) * 2 - 1;
+        changes = true;
+    } else if (moveCam) {
+        vEye[0] = w / 2 - (e.pageX - bcr.left);
+        vEye[1] = (e.pageY - bcr.top) - h / 2;
+        changes = true;
+    }
+    if (changes) {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(render);
+    }
 });
 
 
