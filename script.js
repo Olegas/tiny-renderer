@@ -273,10 +273,10 @@ function lookat(eye, center, up) {
 const proj = M.i(4);
 
 const vp = M.fromArray(4, [
-    w / 3, 0, 0, w / 2,
-    0, -h / 3, 0, h / 2,
-    0, 0, depth / 2, depth / 2,
-    0, 0, 0, 1
+    w/3,    0,       0,     w/2,
+    0,   -h/3,       0,     h/2,
+    0,      0, depth/2, depth/2,
+    0,      0,       0,       1
 ]);
 
 let view;
