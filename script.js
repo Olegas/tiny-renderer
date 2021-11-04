@@ -1,13 +1,13 @@
 const cnv = document.getElementById('canvas');
-const cnvZB = document.getElementById('zbuffer');
 const w = cnv.width;
 const h = cnv.height;
+const cnvZB = new OffscreenCanvas(w, h);
 const ctx = cnv.getContext('2d');
 const ctxZB = cnvZB.getContext('2d');
 let id = ctx.getImageData(0, 0, w, h);
 const zBuffer = new Array(w * h);
-const vLight = [-1, 0, -1];
-const vEye = [-0, 0, 6];
+const vLight = [0, 0, -1];
+const vEye = [0, 0, 6];
 const vCenter = [0, 0, 0];
 const vUp = [0, 1, 0];
 const depth = 255;
@@ -21,7 +21,8 @@ function loadObj(path) {
             const res = {
                 v: [],
                 f: [],
-                vt: []
+                vt: [],
+                vn: []
             };
             data.split('\n')
                 .forEach((l) => {
@@ -39,6 +40,9 @@ function loadObj(path) {
                             rest.shift();
                             res.vt.push(rest.map(Number));
                             break;
+                        case 'vn':
+                            rest.shift();
+                            res.vn.push(rest.map(Number));
                     }
                 })
             return res;
@@ -195,6 +199,10 @@ function normalize(v) {
     return v;
 }
 
+function mul(s, v) {
+    return [v[0] * s, v[1] * s, v[2] * 3];
+}
+
 function add(v1, v2) {
     return [v1[0] + v2[0], v1[1] + v2[1], v1[2] + v2[2]];
 }
@@ -245,19 +253,26 @@ function line(p1, p2, color) {
 }
 
 function baricentric(pts, P, b) {
-    const u = cross(
-        [pts[2][0] - pts[0][0], pts[1][0] - pts[0][0], pts[0][0] - P[0]],
-        [pts[2][1] - pts[0][1], pts[1][1] - pts[0][1], pts[0][1] - P[1]]);
+    const [A, B, C] = pts;
+    const v = cross([
+        B[0] - A[0],
+        C[0] - A[0],
+        A[0] - P[0]
+    ], [
+        B[1] - A[1],
+        C[1] - A[1],
+        A[1] - P[1]
+    ]);
     /* `pts` and `P` has integer value as coordinates
-       so `abs(u[2])` < 1 means `u[2]` is 0, that means
+       so `abs(v[2])` < 1 means `u[2]` is 0, that means
        triangle is degenerate, in this case return something with negative coordinates */
-    if (Math.abs(u[2]) < 1) {
+    if (Math.abs(v[2]) < 1) {
         b[0] = -1;
         return;
     }
-    b[0] = 1 - (u[0] + u[1]) / u[2];
-    b[1] = u[1] / u[2];
-    b[2] = u[0] / u[2];
+    b[0] = 1 - (v[0] + v[1]) / v[2];
+    b[1] = v[1] / v[2];
+    b[2] = v[0] / v[2];
 }
 
 function lookat(eye, center, up) {
@@ -276,9 +291,11 @@ function lookat(eye, center, up) {
 
 const proj = M.i(4);
 
+let rot = M.i(4);
+
 const vp = M.fromArray(4, [
-    w/3,    0,       0,     w/2,
-    0,   -h/3,       0,     h/2,
+    w/4,    0,       0,     w/2,
+    0,   -h/4,       0,     h/2,
     0,      0, depth/2, depth/2,
     0,      0,       0,       1
 ]);
@@ -291,11 +308,11 @@ function updateView() {
 }
 
 
-function extendTo3d(v) {
+function extendTo4d(v) {
     return [...v, 1];
 }
 
-function to2d(v) {
+function to3d(v) {
     return [
         v[0] / v[3] >> 0,
         v[1] / v[3] >> 0,
@@ -303,7 +320,7 @@ function to2d(v) {
     ]
 }
 
-function triangle(points, color) {
+function triangle(points, vTex, intensity) {
     const minX = Math.min(points[0][0], points[1][0], points[2][0]);
     const minY = Math.min(points[0][1], points[1][1], points[2][1]);
     const maxX = Math.max(points[0][0], points[1][0], points[2][0]);
@@ -319,6 +336,9 @@ function triangle(points, color) {
             if (b[0] < 0 || b[1] < 0 || b[2] < 0) continue;
             v[2] = 0;
             for (let i = 0; i < 3; i++) v[2] += points[i][2] * b[i];
+            const [A, B, C] = vTex;
+            const tv = add(A, add(mul(b[0], sub(B, A)), mul(b[1], sub(C, A))));
+            const color = currentTexture.get(tv[0] * currentTexture.width, tv[1] * currentTexture.height, intensity);
             const zBi = (v[0] + v[1] * w) >> 0;
             if (zBuffer[zBi] < v[2]) {
                 zBuffer[zBi] = v[2];
@@ -344,22 +364,26 @@ function gray(i) {
 
 const vWorld = new Array(3);
 const vScreen = new Array(3);
+const vTex = new Array(3);
 
 function drawObj(o) {
     const vLightN = normalize([...vLight]);
     o.f.forEach((f) => {
         for (let i = 0; i < 3; i++) {
             vWorld[i] = o.v[f[i][0]];
-            vScreen[i] = to2d(vp.mul(proj.mul(view.mul(M.fromVector(extendTo3d(vWorld[i]))))).toVector());
+            vTex[i] = o.vt[f[i][1]];
         }
         const n = normalize(cross(
             sub(vWorld[2], vWorld[0]),
             sub(vWorld[1], vWorld[0])
         ));
-        const intensity = dot(n, vLightN);
-        if (intensity > 0) {
-            triangle(vScreen, gray(intensity));
-        }
+        const intensityL = dot(n, vLightN);
+        // if (intensityL) {
+            for (let i = 0; i < 3; i++) {
+                vScreen[i] = to3d(vp.mul(proj.mul(rot.mul(view.mul(M.fromVector(extendTo4d(vWorld[i])))))).toVector());
+            }
+            triangle(vScreen, vTex, Math.max(0, intensityL));
+        // }
     })
 }
 
@@ -376,7 +400,7 @@ function toColorArray(d) {
 }
 
 function drawZBuffer() {
-    ctxZB.fillStyle = '#000000';
+    ctxZB.fillStyle = '#000000FF';
     ctxZB.fillRect(0, 0, w, h);
     const d = ctxZB.getImageData(0, 0, w, h);
     for(let i = 0; i < w; i++) {
@@ -393,9 +417,9 @@ function drawZBuffer() {
 }
 
 let currentObject;
+let currentTexture;
 
 function render() {
-    updateView();
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, w, h);
     id = ctx.getImageData(0, 0, w, h);
@@ -403,12 +427,20 @@ function render() {
     drawObj(currentObject);
     ctx.putImageData(id, 0, 0);
     drawZBuffer();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.rect(0, h - h/3, w/3, h/3);
+    ctx.stroke();
+    ctx.drawImage(cnvZB, 0, 0, w, h, 0, h - h/3, w/3, h/3);
 }
 
 loadObj('head.obj').then((o) => {
     currentObject = o;
-    render();
-    moveLight();
+    (new TGAImage('./african_head_diffuse.tga')).load().then((t) => {
+        currentTexture = t;
+        updateView();
+        render();
+        rotY(0);
+    });
 });
 
 document.addEventListener('keydown', (e) => {
@@ -429,6 +461,17 @@ document.addEventListener('keyup', (e) => {
     }
 });
 
+function rotY(a) {
+    rot = M.fromArray(4, [
+        Math.cos(a), 0, Math.sin(a), 0,
+        0, 1, 0, 0,
+        -Math.sin(a), 0, Math.cos(a), 0,
+        0, 0, 0, 1
+    ]);
+    render();
+    setTimeout(() => requestAnimationFrame(() => rotY(a + Math.PI / 360)), 1000 / 60);
+}
+
 
 const bcr = cnv.getBoundingClientRect();
 let frame;
@@ -441,6 +484,7 @@ cnv.addEventListener('mousemove', (e) => {
     } else if (moveCam) {
         vEye[0] = w / 2 - (e.pageX - bcr.left);
         vEye[1] = (e.pageY - bcr.top) - h / 2;
+        updateView();
         changes = true;
     }
     if (changes) {
