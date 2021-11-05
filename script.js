@@ -291,12 +291,12 @@ function lookat(eye, center, up) {
 
 const proj = M.i(4);
 
-let rot = M.i(4);
+let rotMat = M.i(4);
 
 const vp = M.fromArray(4, [
-    w/4,    0,       0,     w/2,
-    0,   -h/4,       0,     h/2,
-    0,      0, depth/2, depth/2,
+    w/3,    0,       0,     w/2,
+    0,   -h/3,       0,     h/2,
+    0,      0, depth/3, depth/2,
     0,      0,       0,       1
 ]);
 
@@ -337,7 +337,19 @@ function triangle(points, vTex, intensity) {
             v[2] = 0;
             for (let i = 0; i < 3; i++) v[2] += points[i][2] * b[i];
             const [A, B, C] = vTex;
-            const tv = add(A, add(mul(b[0], sub(B, A)), mul(b[1], sub(C, A))));
+            const tv = add(
+                B,
+                add(
+                    mul(
+                        b[0],
+                        sub(A, B)
+                    ),
+                    mul(
+                        b[1],
+                        sub(C, B)
+                    )
+                )
+            );
             const color = currentTexture.get(tv[0] * currentTexture.width, tv[1] * currentTexture.height, intensity);
             const zBi = (v[0] + v[1] * w) >> 0;
             if (zBuffer[zBi] < v[2]) {
@@ -380,23 +392,11 @@ function drawObj(o) {
         const intensityL = dot(n, vLightN);
         // if (intensityL) {
             for (let i = 0; i < 3; i++) {
-                vScreen[i] = to3d(vp.mul(proj.mul(rot.mul(view.mul(M.fromVector(extendTo4d(vWorld[i])))))).toVector());
+                vScreen[i] = to3d(vp.mul(proj.mul(rotMat.mul(view.mul(M.fromVector(extendTo4d(vWorld[i])))))).toVector());
             }
             triangle(vScreen, vTex, Math.max(0, intensityL));
         // }
     })
-}
-
-function toColorArray(d) {
-    const res = new Array(d.length / 4);
-    res.fill(0);
-    for(let i = 0; i < d.length; i++) {
-        const bOffset = i % 4;
-        if (bOffset < 3) {
-            res[i / 4 >> 0] |= d[i] << (8 * bOffset);
-        }
-    }
-    return res;
 }
 
 function drawZBuffer() {
@@ -437,9 +437,9 @@ loadObj('head.obj').then((o) => {
     currentObject = o;
     (new TGAImage('./african_head_diffuse.tga')).load().then((t) => {
         currentTexture = t;
+        rotMat = rotate(0, 0, 0);
         updateView();
         render();
-        rotY(0);
     });
 });
 
@@ -461,15 +461,26 @@ document.addEventListener('keyup', (e) => {
     }
 });
 
-function rotY(a) {
-    rot = M.fromArray(4, [
-        Math.cos(a), 0, Math.sin(a), 0,
-        0, 1, 0, 0,
-        -Math.sin(a), 0, Math.cos(a), 0,
+function rotate(x, y, z) {
+    const rotX = M.fromArray(4, [
+        1, 0, 0, 0,
+        0, Math.cos(x), -Math.sin(x), 0,
+        0, Math.sin(x), Math.cos(x), 0,
         0, 0, 0, 1
     ]);
-    render();
-    setTimeout(() => requestAnimationFrame(() => rotY(a + Math.PI / 360)), 1000 / 60);
+    const rotY = M.fromArray(4, [
+        Math.cos(y), 0, Math.sin(y), 0,
+        0, 1, 0, 0,
+        -Math.sin(y), 0, Math.cos(y), 0,
+        0, 0, 0, 1
+    ]);
+    const rotZ = M.fromArray(4, [
+        Math.cos(z), -Math.sin(z), 0, 0,
+        Math.sin(z), Math.cos(z), 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    ]);
+    return rotX.mul(rotY.mul(rotZ));
 }
 
 
