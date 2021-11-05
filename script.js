@@ -76,7 +76,7 @@ function triangle(points, vTex, intensity) {
                     )
                 )
             );
-            const color = currentTexture.get(tv[0] * currentTexture.width, tv[1] * currentTexture.height, intensity);
+            const color = currentTexture.get(tv[0] * currentTexture.width, tv[1] * currentTexture.height, intensity, 0.9);
             const zBi = (v[0] + v[1] * w) >> 0;
             if (zBuffer[zBi] < v[2]) {
                 zBuffer[zBi] = v[2];

@@ -109,13 +109,14 @@ class TGAImage {
         return this;
     }
 
-    get(x, y, intensity = 1) {
+    get(x, y, intensity = 1, gamma = 1) {
         intensity = Math.max(0, Math.min(1, intensity));
         x = x >> 0;
         y = y >> 0;
-        const b = this.data.getUint8((y * this.width + x) * this.bytespp) * intensity;
-        const g = this.data.getUint8((y * this.width + x) * this.bytespp + 1) * intensity;
-        const r = this.data.getUint8((y * this.width + x) * this.bytespp + 2) * intensity;
+        const offset = (y * this.width + x) * this.bytespp;
+        const b = Math.pow(this.data.getUint8(offset) / 255, gamma) * 255 * intensity;
+        const g = Math.pow(this.data.getUint8(offset + 1) / 255, gamma) * 255 * intensity;
+        const r = Math.pow(this.data.getUint8(offset + 2) / 255, gamma) * 255 * intensity;
         return (r << 16) | (g << 8) | b;
     }
 }
