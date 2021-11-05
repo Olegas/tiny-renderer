@@ -14,267 +14,6 @@ const depth = 255;
 let moveLight = false;
 let moveCam = false;
 
-function loadObj(path) {
-    return fetch(path)
-        .then((res) => res.text())
-        .then((data) => {
-            const res = {
-                v: [],
-                f: [],
-                vt: [],
-                vn: []
-            };
-            data.split('\n')
-                .forEach((l) => {
-                    const [item, ...rest] = l.split(' ');
-                    switch (item) {
-                        case 'v':
-                            res.v.push(rest.map(Number));
-                            break;
-                        case 'f':
-                            res.f.push(rest.map((i) => {
-                                return i.split('/').map((v) => +v - 1);
-                            }));
-                            break;
-                        case 'vt':
-                            rest.shift();
-                            res.vt.push(rest.map(Number));
-                            break;
-                        case 'vn':
-                            rest.shift();
-                            res.vn.push(rest.map(Number));
-                    }
-                })
-            return res;
-        });
-}
-
-class M {
-
-    static fromVector(v) {
-        return new M(v.length, 1, v);
-    }
-
-    static fromVectors(v) {
-        const d = [];
-        for (const i of v) {
-            d.push(...i);
-        }
-        return new M(v[0].length, v.length, d);
-    }
-
-    static fromArray(rows, a) {
-        const cols = a.length / rows;
-        return new M(cols, rows, a).t;
-    }
-
-    static i(d) {
-        const _d = new Array(d * d);
-        _d.fill(0);
-        for (let i = 0; i < d; i++) {
-            _d[i + i * d] = 1;
-        }
-        return new M(d, d, _d);
-    }
-
-    static z(d) {
-        return new M(d, d, new Array(d * d).fill(0));
-    }
-
-    constructor(rows, cols, d) {
-        this.w = cols;
-        this.h = rows;
-        this.d = d;
-    }
-
-    get rows() {
-        return this.h;
-    }
-
-    get cols() {
-        return this.w;
-    }
-
-    get t() {
-        const res = new M(this.cols, this.rows, new Array(this.d.length));
-        for (let i = 0; i < this.rows; i++) {
-            for (let j = 0; j < this.cols; j++) {
-                res.set(j, i, this.get(i, j));
-            }
-        }
-        return res;
-    }
-
-    get(i, j) {
-        return this.d[j * this.h + i];
-    }
-
-    set(i, j, v) {
-        this.d[j * this.h + i] = v;
-    }
-
-    mul(v) {
-        let _h;
-        let _w;
-        let _d;
-        if (v instanceof M) {
-            _h = v.h;
-            _w = v.w;
-            _d = v.d;
-        } else if (v instanceof Array) {
-            _h = v.length;
-            _w = 1;
-            _d = v;
-        } else {
-            return new M(this.h, this.w, this.d.map((i) => i * v));
-        }
-
-        if (this.w !== _h)
-            throw 'Incorrect dimensions';
-
-        const d = new Array(_w * _h);
-        for (let i = 0; i < _h; i++) { // строка
-            for (let j = 0; j < _w; j++) { // столбец
-                const idx = i + _h * j;
-                d[idx] = 0;
-                for (let k = 0; k < _h; k++) {
-                    // i строка * j столбец
-                    // перебираем столбцы --- перебираем строки
-                    d[idx] += this.d[i + this.h * k] * _d[k + _h * j];
-                    // console.log(`${i},${k}=${this.d[i + this.h * k]}    ${k},${j}=${_d[k + _h * j]}    -> ${i},${j}`);
-                }
-                // console.log('');
-            }
-        }
-        return new M(_h, _w, d);
-    }
-
-    toString() {
-        let ret = '';
-        for (let i = 0; i < this.h; i++) {
-            for (let j = 0; j < this.w; j++) {
-                ret += this.d[j * this.h + i] + ' ';
-            }
-            ret += '\n';
-        }
-        return ret;
-    }
-
-    toVector() {
-        if (this.w !== 1)
-            throw 'Incorrect dimension';
-        return this.d;
-    }
-
-    toVectors() {
-        const res = [];
-        for (let i = 0; i < this.w; i++) {
-            res.push(this.d.slice(i * this.h, i * this.h + this.w + 1));
-        }
-        return res;
-    }
-}
-
-
-function set(x, y, color) {
-    //ctx.fillStyle = color;
-    //ctx.fillRect(x, y, 1, 1);
-    const offset = ((y >> 0) * w + (x >> 0)) * 4;
-    let mask = 0xFF0000;
-    for (let i = 0; i <= 3; i++) {
-        id.data[offset + i] = i < 3 ? (color & mask) >> 8 * (2 - i) : 0xFF;
-        mask >>= 8;
-    }
-}
-
-function norm(v) {
-    return Math.sqrt(Math.pow(v[0], 2) + Math.pow(v[1], 2) + Math.pow(v[2], 2));
-}
-
-function normalize(v) {
-    const n = norm(v);
-    v[0] = v[0] / n;
-    v[1] = v[1] / n;
-    v[2] = v[2] / n;
-    return v;
-}
-
-function mul(s, v) {
-    return [v[0] * s, v[1] * s, v[2] * 3];
-}
-
-function add(v1, v2) {
-    return [v1[0] + v2[0], v1[1] + v2[1], v1[2] + v2[2]];
-}
-
-function sub(v1, v2) {
-    return [v1[0] - v2[0], v1[1] - v2[1], v1[2] - v2[2]];
-}
-
-// https://www.mathsisfun.com/algebra/vectors-cross-product.html
-function cross(v1, v2) {
-    const [x0, y0, z0] = v1;
-    const [x1, y1, z1] = v2;
-    return [
-        y0 * z1 - z0 * y1,
-        z0 * x1 - x0 * z1,
-        x0 * y1 - y0 * x1
-    ];
-}
-
-function dot(v1, v2) {
-    return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
-}
-
-function line(p1, p2, color) {
-    let [x0, y0] = p1;
-    let [x1, y1] = p2;
-
-    let r = false;
-    if (Math.abs(x1 - x0) < Math.abs(y1 - y0)) {
-        [x0, x1, y0, y1] = [y0, y1, x0, x1];
-        r = true;
-    }
-
-    if (x0 > x1) {
-        [x1, x0, y1, y0] = [x0, x1, y0, y1];
-    }
-
-    for (let x = x0; x <= x1; x += 1) {
-        const t = (x - x0) / (x1 - x0);
-        const y = y0 * (1 - t) + y1 * t;
-        if (r) {
-            // noinspection JSSuspiciousNameCombination
-            set(y, x, color);
-        } else {
-            set(x, y, color);
-        }
-    }
-}
-
-function baricentric(pts, P, b) {
-    const [A, B, C] = pts;
-    const v = cross([
-        B[0] - A[0],
-        C[0] - A[0],
-        A[0] - P[0]
-    ], [
-        B[1] - A[1],
-        C[1] - A[1],
-        A[1] - P[1]
-    ]);
-    /* `pts` and `P` has integer value as coordinates
-       so `abs(v[2])` < 1 means `u[2]` is 0, that means
-       triangle is degenerate, in this case return something with negative coordinates */
-    if (Math.abs(v[2]) < 1) {
-        b[0] = -1;
-        return;
-    }
-    b[0] = 1 - (v[0] + v[1]) / v[2];
-    b[1] = v[1] / v[2];
-    b[2] = v[0] / v[2];
-}
-
 function lookat(eye, center, up) {
     const z = normalize(sub(eye, center));
     const x = normalize(cross(up, z));
@@ -291,7 +30,7 @@ function lookat(eye, center, up) {
 
 const proj = M.i(4);
 
-let rotMat = M.i(4);
+let rotMat = rotate(0, 0, 0);
 
 const vp = M.fromArray(4, [
     w/3,    0,       0,     w/2,
@@ -305,19 +44,6 @@ let view;
 function updateView() {
     view = lookat(vEye, vCenter, vUp);
     proj.set(3, 2, -1 / norm(sub(vEye, vCenter)));
-}
-
-
-function extendTo4d(v) {
-    return [...v, 1];
-}
-
-function to3d(v) {
-    return [
-        v[0] / v[3] >> 0,
-        v[1] / v[3] >> 0,
-        v[2] / v[3] >> 0
-    ]
 }
 
 function triangle(points, vTex, intensity) {
@@ -359,19 +85,6 @@ function triangle(points, vTex, intensity) {
 
         }
     }
-}
-
-function toScreen(v) {
-    return [
-        ((v[0] + 1) * w / 2) >> 0,
-        (h - (v[1] + 1) * h / 2) >> 0,
-        v[2]
-    ];
-}
-
-function gray(i) {
-    const v = 255 * i >> 0;
-    return (v << 16) | (v << 8) | v;
 }
 
 const vWorld = new Array(3);
@@ -437,7 +150,6 @@ loadObj('head.obj').then((o) => {
     currentObject = o;
     (new TGAImage('./african_head_diffuse.tga')).load().then((t) => {
         currentTexture = t;
-        rotMat = rotate(0, 0, 0);
         updateView();
         render();
     });
