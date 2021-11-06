@@ -9,5 +9,18 @@ function set(x, y, color) {
     }
 }
 
+function createOffscreenCanvas(w, h) {
+    if (typeof OffscreenCanvas !== 'undefined') {
+        return new OffscreenCanvas(w, h);
+    } else {
+        const elt = document.createElement('canvas');
+        elt.id = 'zbCanvas';
+        elt.width = w;
+        elt.height = h;
+        document.body.appendChild(elt);
+        return elt;
+    }
+}
+
 
 
