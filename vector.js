@@ -43,8 +43,8 @@ function extendTo4d(v) {
 
 function to3d(v) {
     return [
-        v[0] / v[3] >> 0,
-        v[1] / v[3] >> 0,
-        v[2] / v[3] >> 0
+        v[0] / v[3],
+        v[1] / v[3],
+        v[2] / v[3]
     ]
 }

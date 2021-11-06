@@ -1,16 +1,16 @@
 const cnv = document.getElementById('canvas');
 const w = cnv.width;
 const h = cnv.height;
-const cnvZB = new OffscreenCanvas(w, h);
+const cnvZB = createOffscreenCanvas(w, h);
 const ctx = cnv.getContext('2d');
 const ctxZB = cnvZB.getContext('2d');
-let id = ctx.getImageData(0, 0, w, h);
 const zBuffer = new Array(w * h);
-const vLight = [0, 0, -1];
-const vEye = [0, 0, 6];
+const vLight = [0, 0, 1];
+const vEye = [0, 0, 8];
 const vCenter = [0, 0, 0];
 const vUp = [0, 1, 0];
 const depth = 255;
+const shader = GouraudShader;
 let moveLight = false;
 let moveCam = false;
 
@@ -40,17 +40,22 @@ const vp = M.fromArray(4, [
 ]);
 
 let view;
+let transform;
 
 function updateView() {
     view = lookat(vEye, vCenter, vUp);
     proj.set(3, 2, -1 / norm(sub(vEye, vCenter)));
 }
 
-function triangle(points, vTex, intensity) {
-    const minX = Math.min(points[0][0], points[1][0], points[2][0]);
-    const minY = Math.min(points[0][1], points[1][1], points[2][1]);
-    const maxX = Math.max(points[0][0], points[1][0], points[2][0]);
-    const maxY = Math.max(points[0][1], points[1][1], points[2][1]);
+function updateTransform() {
+    transform = vp.mul(proj.mul(rotMat.mul(view)));
+}
+
+function triangle(points, shader, id) {
+    const minX = Math.max(0, Math.min(points[0][0] >> 0, points[1][0] >> 0, points[2][0] >> 0));
+    const minY = Math.max(0, Math.min(points[0][1] >> 0, points[1][1] >> 0, points[2][1] >> 0));
+    const maxX = Math.min(w, Math.max(points[0][0] >> 0, points[1][0] >> 0, points[2][0] >> 0));
+    const maxY = Math.min(h, Math.max(points[0][1] >> 0, points[1][1] >> 0, points[2][1] >> 0));
     const v = [];
     const b = [];
     for (let x = minX; x <= maxX; x++) {
@@ -62,54 +67,27 @@ function triangle(points, vTex, intensity) {
             if (b[0] < 0 || b[1] < 0 || b[2] < 0) continue;
             v[2] = 0;
             for (let i = 0; i < 3; i++) v[2] += points[i][2] * b[i];
-            const [A, B, C] = vTex;
-            const tv = add(
-                B,
-                add(
-                    mul(
-                        b[0],
-                        sub(A, B)
-                    ),
-                    mul(
-                        b[1],
-                        sub(C, B)
-                    )
-                )
-            );
-            const color = currentTexture.get(tv[0] * currentTexture.width, tv[1] * currentTexture.height, intensity, 0.9);
-            const zBi = (v[0] + v[1] * w) >> 0;
-            if (zBuffer[zBi] < v[2]) {
-                zBuffer[zBi] = v[2];
-                set(x, y, color);
+            const color = shader.fragment(b);
+            if (color !== undefined) {
+                const zBi = (v[0] + v[1] * w) >> 0;
+                if (zBuffer[zBi] < v[2]) {
+                    zBuffer[zBi] = v[2];
+                    set(id, x, y, color);
+                }
             }
-
         }
     }
 }
 
-const vWorld = new Array(3);
-const vScreen = new Array(3);
-const vTex = new Array(3);
-
-function drawObj(o) {
-    const vLightN = normalize([...vLight]);
-    o.f.forEach((f) => {
-        for (let i = 0; i < 3; i++) {
-            vWorld[i] = o.v[f[i][0]];
-            vTex[i] = o.vt[f[i][1]];
+function render(model, Shader, vLight, id) {
+    const shader = new Shader(model, vLight);
+    const vScreen = new Array(3);
+    for(let nFace = 0; nFace < model.nFaces; nFace++) {
+        for(let i = 0; i < 3; i++) {
+            vScreen[i] = shader.vertex(nFace, i);
         }
-        const n = normalize(cross(
-            sub(vWorld[2], vWorld[0]),
-            sub(vWorld[1], vWorld[0])
-        ));
-        const intensityL = dot(n, vLightN);
-        // if (intensityL) {
-            for (let i = 0; i < 3; i++) {
-                vScreen[i] = to3d(vp.mul(proj.mul(rotMat.mul(view.mul(M.fromVector(extendTo4d(vWorld[i])))))).toVector());
-            }
-            triangle(vScreen, vTex, Math.max(0, intensityL));
-        // }
-    })
+        triangle(vScreen, shader, id);
+    }
 }
 
 function drawZBuffer() {
@@ -130,30 +108,37 @@ function drawZBuffer() {
 }
 
 let currentObject;
-let currentTexture;
 
-function render() {
+function tick() {
+
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, w, h);
-    id = ctx.getImageData(0, 0, w, h);
+    const id = ctx.getImageData(0, 0, w, h);
     zBuffer.fill(-Infinity);
-    drawObj(currentObject);
+    render(currentObject, shader, vLight, id);
     ctx.putImageData(id, 0, 0);
     drawZBuffer();
     ctx.strokeStyle = '#FFFFFF';
     ctx.rect(0, h - h/3, w/3, h/3);
     ctx.stroke();
     ctx.drawImage(cnvZB, 0, 0, w, h, 0, h - h/3, w/3, h/3);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(shader.prototype.constructor.name, 5, 10);
+    ctx.fillText(`Light: ${vLight.map((i) => i.toFixed(2)).join(', ')}`, 5, 20);
+    ctx.fillText(`Eye  : ${vEye.map((i) => i.toFixed(2)).join(', ')}`, 5, 30);
+    ctx.fillText('Z Buffer', 5, h - h/3 + 10)
 }
 
-loadObj('head.obj').then((o) => {
-    currentObject = o;
-    (new TGAImage('./african_head_diffuse.tga')).load().then((t) => {
-        currentTexture = t;
-        updateView();
-        render();
-    });
+currentObject = new Model('./models/head.obj', {
+    diffuse: './models/african_head_diffuse.tga'
 });
+
+currentObject.load().then(() => {
+    updateView();
+    updateTransform();
+    tick();
+})
 
 document.addEventListener('keydown', (e) => {
     if (e.code === 'KeyL') {
@@ -201,8 +186,8 @@ let frame;
 cnv.addEventListener('mousemove', (e) => {
     let changes;
     if (moveLight) {
-        vLight[0] = 1 - ((e.pageX - bcr.left) / bcr.width) * 2;
-        vLight[1] = ((e.pageY - bcr.top) / bcr.height) * 2 - 1;
+        vLight[0] = ((e.pageX - bcr.left) / bcr.width) * 2 - 1;
+        vLight[1] = 1 - ((e.pageY - bcr.top) / bcr.height) * 2;
         changes = true;
     } else if (moveCam) {
         vEye[0] = w / 2 - (e.pageX - bcr.left);
@@ -211,8 +196,9 @@ cnv.addEventListener('mousemove', (e) => {
         changes = true;
     }
     if (changes) {
+        updateTransform();
         cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(render);
+        frame = requestAnimationFrame(tick);
     }
 });
 

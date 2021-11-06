@@ -27,12 +27,12 @@ function line(p1, p2, color) {
 function baricentric(pts, P, b) {
     const [A, B, C] = pts;
     const v = cross([
-        B[0] - A[0],
         C[0] - A[0],
+        B[0] - A[0],
         A[0] - P[0]
     ], [
-        B[1] - A[1],
         C[1] - A[1],
+        B[1] - A[1],
         A[1] - P[1]
     ]);
     /* `pts` and `P` has integer value as coordinates

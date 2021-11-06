@@ -1,4 +1,4 @@
-function set(x, y, color) {
+function set(id, x, y, color) {
     //ctx.fillStyle = color;
     //ctx.fillRect(x, y, 1, 1);
     const offset = ((y >> 0) * w + (x >> 0)) * 4;
