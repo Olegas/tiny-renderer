@@ -10,7 +10,7 @@ const vEye = [0, 0, 8];
 const vCenter = [0, 0, 0];
 const vUp = [0, 1, 0];
 const depth = 255;
-const shader = GouraudShader;
+const shader = DiffuseShader;
 let moveLight = false;
 let moveCam = false;
 

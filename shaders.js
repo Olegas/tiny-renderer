@@ -33,37 +33,6 @@ class FlatShader {
     }
 }
 
-class DiffuseShader extends FlatShader {
-
-    constructor(...args) {
-        super(...args);
-        this.uV = new Array(3);
-    }
-
-    vertex(nFace, nVert) {
-        this.uV[nVert] = this.model.uv(nFace, nVert);
-        return super.vertex(nFace, nVert);
-    }
-
-    fragment(b) {
-        const [A, B, C] = this.uV;
-        const tv = add(
-            A,
-            add(
-                mul(
-                    b[0],
-                    sub(B, A)
-                ),
-                mul(
-                    b[1],
-                    sub(C, A)
-                )
-            )
-        )
-        return this.model.diffuse(tv, this._lightIntensity(b));
-    }
-}
-
 class GouraudShader extends FlatShader {
     constructor(...args) {
         super(...args);
@@ -78,5 +47,36 @@ class GouraudShader extends FlatShader {
 
     _lightIntensity(b) {
         return dot(this.vi, b);
+    }
+}
+
+class DiffuseShader extends GouraudShader {
+
+    constructor(...args) {
+        super(...args);
+        this.uV = new Array(3);
+    }
+
+    vertex(nFace, nVert) {
+        this.uV[nVert] = this.model.uv(nFace, nVert);
+        return super.vertex(nFace, nVert);
+    }
+
+    fragment(b) {
+        const [B, C, A] = this.uV;
+        const tv = add(
+            A,
+            add(
+                mul(
+                    b[0],
+                    sub(B, A)
+                ),
+                mul(
+                    b[1],
+                    sub(C, A)
+                )
+            )
+        )
+        return this.model.diffuse(tv, this._lightIntensity(b));
     }
 }
