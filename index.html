@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>JS Tiny Renderer</title>
+    <style>
+        #zbCanvas {
+            position: absolute;
+            left: -10000px;
+            top: -10000px;
+        }
+    </style>
 </head>
 <body>
     <canvas width="640" height="480" id="canvas"></canvas>
@@ -10,8 +17,9 @@
     <script src="vector.js"></script>
     <script src="matrix.js"></script>
     <script src="geometry.js"></script>
-    <script src="obj.js"></script>
+    <script src="model.js"></script>
     <script src="tga.js"></script>
+    <script src="shaders.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
