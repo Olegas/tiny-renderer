@@ -76,7 +76,7 @@
             const { diffuse } = this.textures;
             const { width, height } = diffuse;
             const [x, y] = uv;
-            return diffuse.get(x * width, y * height, intensity);
+            return diffuse.get(x * width, y * height, intensity, 1.01);
         }
     }
 

@@ -30,7 +30,7 @@ function lookat(eye, center, up) {
 
 const proj = M.i(4);
 
-let rotMat = rotate(0, 0, 0);
+let rotMat = rotate(Math.PI / 15, -Math.PI / 10, 0);
 
 const vp = M.fromArray(4, [
     w/3,    0,       0,     w/2,
